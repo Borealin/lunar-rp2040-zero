@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate tag version
+        run: test "$GITHUB_REF_NAME" = "v$(tr -d '[:space:]' < VERSION)"
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: Build firmware
+        run: |
+          make sdk
+          make firmware
+          mkdir release
+          cp build/lunar_rp2040_zero.uf2 release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-firmware
+          path: release/lunar_rp2040_zero.uf2
+          if-no-files-found: error
+
+  host:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: host/lunar-sensor-bridge/go.mod
+          cache-dependency-path: host/lunar-sensor-bridge/go.mod
+      - name: Test and vet
+        run: |
+          make test
+          make vet
+      - name: Build arm64 bridge
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: arm64
+        run: |
+          OUTPUT_DIR="$PWD/release" make host
+          mv release/lunar-sensor-bridge release/lunar-sensor-bridge-darwin-arm64
+          tar -C release -czf release/lunar-sensor-bridge-darwin-arm64.tar.gz lunar-sensor-bridge-darwin-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-host
+          path: release/lunar-sensor-bridge-darwin-arm64.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [firmware, host]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release-assets/* --generate-notes --verify-tag

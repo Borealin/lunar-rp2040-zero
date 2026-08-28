@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: Install Pico SDK
+        run: make sdk
+      - name: Build firmware
+        run: make firmware
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            build/lunar_rp2040_zero.uf2
+            build/lunar_rp2040_zero.elf
+            build/lunar_rp2040_zero.map
+          if-no-files-found: error
+
+  host:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: host/lunar-sensor-bridge/go.mod
+          cache-dependency-path: host/lunar-sensor-bridge/go.mod
+      - name: Test and vet
+        run: |
+          make test
+          make vet
+      - name: Verify embedded version
+        run: |
+          make host
+          test "$(build-host/lunar-sensor-bridge --version)" = "$(tr -d '[:space:]' < VERSION)"
+      - name: Build arm64 bridge
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: arm64
+        run: make host
+      - name: Verify binary
+        run: file build-host/lunar-sensor-bridge | grep -q arm64
+      - name: Upload bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-bridge
+          path: build-host/lunar-sensor-bridge
+          if-no-files-found: error
