@@ -24,7 +24,7 @@ jobs:
           make firmware
           mkdir release
           cp build/lunar_rp2040_zero.uf2 release/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-firmware
           path: release/lunar_rp2040_zero.uf2
@@ -51,7 +51,7 @@ jobs:
           OUTPUT_DIR="$PWD/release" make host
           mv release/lunar-sensor-bridge release/lunar-sensor-bridge-darwin-arm64
           tar -C release -czf release/lunar-sensor-bridge-darwin-arm64.tar.gz lunar-sensor-bridge-darwin-arm64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-host
           path: release/lunar-sensor-bridge-darwin-arm64.tar.gz
