@@ -11,7 +11,7 @@ jobs:
   firmware:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate tag version
         run: test "$GITHUB_REF_NAME" = "v$(tr -d '[:space:]' < VERSION)"
       - name: Install toolchain
@@ -33,7 +33,7 @@ jobs:
   host:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v5
         with:
           go-version-file: host/lunar-sensor-bridge/go.mod
